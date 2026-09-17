@@ -52,12 +52,12 @@
     if(errors.length === SHEETS.length) throw new Error('시트를 읽지 못했습니다');
     const S = { errors };
     S.events = raw['대회'].filter(o=>!isExample(o)).map(o => ({ id: col(o,'대회ID','ID'), title: col(o,'대회명'), date: isoDate(col(o,'시작일','일자')), endDate: isoDate(col(o,'종료일')), fee: num(col(o,'참가비'))||0, status: col(o,'상태')||'모집중', deadline: isoDate(col(o,'접수마감')), poster: col(o,'포스터파일','포스터'), brief: col(o,'요강') })).filter(e => e.id && e.title);
-    S.members = raw['회원'].filter(o=>!isExample(o)).map(o => { const hcp = num(col(o,'G핸디','핸디')); const auto = gradeFromHcp(hcp); return { name: col(o,'이름'), gzNick: col(o,'골프존닉네임','닉네임'), hcp, grade: col(o,'실력등급') || auto.grade, tier: col(o,'세부등급') || auto.tier, note: col(o,'비고') }; }).filter(m => m.name);
-    S.entries = raw['접수'].filter(o=>!isExample(o)).map(o => ({ eventId: col(o,'대회ID','ID'), name: col(o,'이름'), paid: /완료|확인|입금됨|O|o|✓/.test(col(o,'입금')), date: isoDate(col(o,'접수일','타임스탬프')), memo: col(o,'하고싶은말','메모','한마디') })).filter(x => x.name);
-    S.rounds = raw['라운드'].filter(o=>!isExample(o)).map(o => ({ eventId: col(o,'대회ID','ID'), name: col(o,'이름','닉네임'), date: isoDate(col(o,'플레이날짜','날짜','타임스탬프')), gross: num(col(o,'실타','타수','스코어')), birdies: num(col(o,'버디')), pars: num(col(o,'파')), bogeys: num(col(o,'보기')), doubles: num(col(o,'양파','더블')), note: col(o,'비고') })).filter(x => x.name && x.date);
-    S.leaders = raw['기록부문'].filter(o=>!isExample(o)).map(o => ({ eventId: col(o,'대회ID','ID'), cat: col(o,'부문'), name: col(o,'이름'), value: col(o,'기록') })).filter(x => x.cat);
-    S.scores = raw['최종결과'].filter(o=>!isExample(o)).map(o => ({ eventId: col(o,'대회ID','ID'), rank: num(col(o,'순위')), name: col(o,'이름'), gross: num(col(o,'실타')), net: num(col(o,'보정타','보정')), birdies: num(col(o,'버디'))||0 })).filter(x => x.name && x.gross != null).map(x => ({...x, net: x.net ?? x.gross}));
-    S.prizes = raw['시상'].filter(o=>!isExample(o)).map(o => ({ eventId: col(o,'대회ID','ID'), title: col(o,'시상명','부문'), name: col(o,'이름','수상자'), item: col(o,'부상','협찬품') })).filter(x => x.title);
+    S.members = raw['회원'].filter(o=>!isExample(o)).map(o => { const hcp = num(col(o,'G핸디','핸디')); const auto = gradeFromHcp(hcp); return { name: col(o,'모임닉네임','회원닉네임','이름'), gzNick: col(o,'골프존닉네임','골프존'), hcp, grade: col(o,'실력등급') || auto.grade, tier: col(o,'세부등급') || auto.tier, note: col(o,'비고') }; }).filter(m => m.name);
+    S.entries = raw['접수'].filter(o=>!isExample(o)).map(o => ({ eventId: col(o,'대회ID','ID'), name: col(o,'모임닉네임','닉네임','이름'), paid: /완료|확인|입금됨|O|o|✓/.test(col(o,'입금')), date: isoDate(col(o,'접수일','타임스탬프')), memo: col(o,'하고싶은말','메모','한마디') })).filter(x => x.name);
+    S.rounds = raw['라운드'].filter(o=>!isExample(o)).map(o => ({ eventId: col(o,'대회ID','ID'), name: col(o,'모임닉네임','닉네임','이름'), date: isoDate(col(o,'플레이날짜','날짜','타임스탬프')), gross: num(col(o,'실타','타수','스코어')), birdies: num(col(o,'버디')), pars: num(col(o,'파')), bogeys: num(col(o,'보기')), doubles: num(col(o,'양파','더블')), note: col(o,'비고') })).filter(x => x.name && x.date);
+    S.leaders = raw['기록부문'].filter(o=>!isExample(o)).map(o => ({ eventId: col(o,'대회ID','ID'), cat: col(o,'부문'), name: col(o,'모임닉네임','닉네임','이름'), value: col(o,'기록') })).filter(x => x.cat);
+    S.scores = raw['최종결과'].filter(o=>!isExample(o)).map(o => ({ eventId: col(o,'대회ID','ID'), rank: num(col(o,'순위')), name: col(o,'모임닉네임','닉네임','이름'), gross: num(col(o,'실타')), net: num(col(o,'보정타','보정')), birdies: num(col(o,'버디'))||0 })).filter(x => x.name && x.gross != null).map(x => ({...x, net: x.net ?? x.gross}));
+    S.prizes = raw['시상'].filter(o=>!isExample(o)).map(o => ({ eventId: col(o,'대회ID','ID'), title: col(o,'시상명','부문'), name: col(o,'모임닉네임','닉네임','수상자','이름'), item: col(o,'부상','협찬품') })).filter(x => x.title);
     S.sponsors = raw['협찬'].filter(o=>!isExample(o)).map(o => ({ eventId: col(o,'대회ID','ID'), name: col(o,'협찬자','협찬사'), item: col(o,'품목'), qty: num(col(o,'수량'))||1 })).filter(x => x.name);
     // 라운드/접수/결과에 있는데 회원 명단에 없는 이름 → 임시 회원으로 취급(닉네임 매칭 포함)
     S.memberByName = {};
@@ -170,7 +170,7 @@
       ${entryOpen(e) ? `<div class="notice"><span>${e.status==='진행중' ? '대회 기간 중 언제든 참가할 수 있습니다. 라운드 후 결과 화면을 운영진에게 보내주세요.' : '참가 신청과 입금은 운영진에게 알려주세요. 입금 확인 후 참가가 확정됩니다.'}${e.deadline ? ` 접수 마감 ${fmtDate(e.deadline)}.` : ''}</span><a class="btn small" href="#apply">신청 양식 보기</a></div>` : ''}
     </div>`;
   }
-  const applyForm = e => `[${e.title} 참가 신청]\n이름: \n골프존 닉네임: \n골프존 G핸디: \n입금 여부: (참가비 ${won(e.fee)}) 입금 예정 / 입금 완료\n하고 싶은 말: `;
+  const applyForm = e => `[${e.title} 참가 신청]\n모임 닉네임: \n골프존 닉네임: \n골프존 G핸디: \n입금 여부: (참가비 ${won(e.fee)}) 입금 예정 / 입금 완료\n하고 싶은 말: `;
   function briefHtml(S,e){
     if(!e) return '';
     const apply = entryOpen(e) ? `<div class="card" id="apply" style="margin-top:10px"><div class="sec-head" style="margin-bottom:6px"><h3 style="margin:0">참가 신청 양식</h3><button class="btn small" data-copy="${esc(applyForm(e))}">양식 복사</button></div><pre class="brief" style="margin:0;font-family:inherit;background:var(--surface2);padding:10px 12px;border-radius:10px">${esc(applyForm(e))}</pre><p class="meta" style="margin:8px 0 0">양식을 채워 ${CFG.contactUrl ? `<a href="${esc(CFG.contactUrl)}" target="_blank" rel="noopener">${esc(CFG.contactLabel||'운영진 카톡')}</a>` : '운영진 카톡'}으로 보내주세요. 운영진이 확인 후 접수·입금 확인을 반영합니다.</p></div>` : '';
