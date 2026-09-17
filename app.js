@@ -118,8 +118,9 @@
     warn:'<path d="M12 3 2 21h20zM12 10v5M12 18h.01"/>',
     refresh:'<path d="M21 12a9 9 0 1 1-3-6.7M21 3v6h-6"/>'
   };
-  const ic = (n, cls) => `<svg class="ic ${cls||''}" viewBox="0 0 24 24" aria-hidden="true">${I[n]}</svg>`;
-  const MEDAL = n => { const c = {1:['#f2c14e','#b8862b'],2:['#d9dde3','#8c949c'],3:['#e2a065','#a0622a']}[n]; return `<svg class="medal-svg" viewBox="0 0 28 28" aria-label="${n}위"><path d="M9 2h4l2 6-4 3zM19 2h-4l-2 6 4 3z" fill="${c[1]}"/><circle cx="14" cy="17" r="8" fill="${c[0]}" stroke="${c[1]}" stroke-width="1.5"/><text x="14" y="21" text-anchor="middle" font-family="Barlow Condensed,sans-serif" font-weight="800" font-size="11" fill="${c[1]}">${n}</text></svg>`; };
+  const EMOJI = { trophy:'🏆', users:'👥', star:'🌟', flag:'⛳', gift:'🎁', info:'📋', fire:'🔥', target:'🎯', bird:'🐦', calendar:'📅', check:'✅', link:'🔗', list:'📝', refresh:'🔄' };
+  const ic = (n, cls) => EMOJI[n] ? `<span class="ic em ${cls||''}" aria-hidden="true">${EMOJI[n]}</span>` : `<svg class="ic ${cls||''}" viewBox="0 0 24 24" aria-hidden="true">${I[n]}</svg>`;
+  const MEDAL = n => `<span class="medal-em" aria-label="${n}위">${{1:'🥇',2:'🥈',3:'🥉'}[n]||n}</span>`;
   const EMPTY_SVG = `<svg viewBox="0 0 120 80" aria-hidden="true"><ellipse cx="60" cy="66" rx="44" ry="9" fill="var(--green-soft)"/><path d="M60 62V12" stroke="var(--muted)" stroke-width="2"/><path d="M60 12h22l-6 8 6 8H60z" fill="var(--live)"/><circle cx="46" cy="60" r="4.5" fill="#fff" stroke="var(--line)"/></svg>`;
   const CONTOUR = `<svg class="contour" viewBox="0 0 400 200" preserveAspectRatio="none" aria-hidden="true"><g fill="none" stroke="#fff" stroke-width="1.2"><path d="M-20 150c60-40 120-40 180-10s120 30 260-20"/><path d="M-20 170c60-40 120-40 180-10s120 30 260-20"/><path d="M-20 190c60-40 120-40 180-10s120 30 260-20"/><path d="M220 40c40-30 90-30 200-10"/><path d="M240 60c40-30 90-30 180-10"/></g></svg>`;
   const statusPill = st => st==='종료' ? '<span class="pill done">종료</span>' : '<span class="pill live">LIVE</span>';
@@ -225,7 +226,7 @@
   }
   function participantsHtml(S,e){
     const ens = entriesOf(S,e); if(!ens.length) return '<div class="empty">아직 접수된 참가자가 없습니다.</div>';
-    return `<div class="card scroll" style="padding:6px 16px">${ens.map(n => `<div class="check"><span class="grow name">${esc(S.display(n.name))}${gradeChip(S.member(n.name))}</span>${n.paid ? '<span class="tag paid">입금 확인</span>' : '<span class="tag unpaid">입금 대기</span>'}</div>`).join('')}</div>`;
+    return `<div class="card scroll" style="padding:6px 16px">${ens.map(n => { const m = S.member(n.name) || {}; const gz = n.gzNick || m.gzNick || ''; const hcp = n.hcp != null ? n.hcp : m.hcp; const info = [gz ? `골프존 ${esc(gz)}` : '', hcp != null ? `G핸디 ${ghcp(hcp)}` : ''].filter(Boolean).join(' · '); return `<div class="check"><span class="grow"><span class="name">${esc(S.display(n.name))}${gradeChip(m)}</span>${info ? `<div class="sub">${info}</div>` : ''}</span>${n.paid ? '<span class="tag paid">입금 확인</span>' : '<span class="tag unpaid">입금 대기</span>'}</div>`; }).join('')}</div>`;
   }
   function boardHtml(S,e){
     const rows = board(S,e); if(!rows.length) return `<div class="empty illus">${EMPTY_SVG}최종 결과가 등록되면 순위가 표시됩니다.</div>`;
@@ -241,7 +242,8 @@
   function sponsorsHtml(S,e){
     const list = S.sponsors.filter(s => !e || s.eventId === e.id || s.eventId === '');
     if(!list.length) return '';
-    return `<div class="card" style="margin-top:10px"><div class="eyebrow" style="margin-bottom:6px">협찬</div>${list.map(s => `<div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0"><span class="name">${esc(s.name)}</span><span class="meta">${esc(s.item)}${s.qty>1?` × ${s.qty}`:''}</span></div>`).join('')}</div>`;
+    const total = list.reduce((a,s) => a + (s.qty||1), 0);
+    return `<div class="card" style="margin-top:10px"><div class="eyebrow" style="margin-bottom:6px">협찬 <span class="sub" style="font-weight:400;letter-spacing:0">· ${list.length}명 · ${total}개</span></div><div class="spon"><div class="spon-h"><span>협찬자</span><span>협찬 물품</span><span class="r">수량</span></div>${list.map(s => `<div class="spon-r"><span class="name">${esc(s.name)}</span><span>${esc(s.item)}</span><span class="r num">${s.qty}</span></div>`).join('')}</div></div>`;
   }
   function footerHtml(){ return `<footer><img src="img/logo.png" alt=""><div>CLUB FAIRWAY · Attitude Over Skill, People Over Score · EST. 2026</div></footer>`; }
 

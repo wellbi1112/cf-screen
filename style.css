@@ -219,3 +219,18 @@ input[type=file]{padding:7px}
 .scroll{max-height:400px;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 .scroll thead th{position:sticky;top:0;background:var(--surface);z-index:1}
 .card.scroll{position:relative}
+
+/* 협찬 표 */
+.spon{display:grid;grid-template-columns:1.1fr 1.4fr 48px;column-gap:10px}
+.spon>div{display:contents}
+.spon-h>span{font-size:11.5px;color:var(--muted);padding:4px 0 6px;border-bottom:1px solid var(--line)}
+.spon-r>span{padding:8px 0;border-bottom:1px solid var(--line);font-size:14px;overflow-wrap:anywhere}
+.spon-r:last-child>span{border-bottom:0}
+.spon .r{text-align:right}
+
+/* 이모지 아이콘 */
+.ic.em{width:auto;height:auto;font-size:17px;line-height:1;vertical-align:-2px;margin-right:2px;font-style:normal}
+.sec-head h2 .ic.em{font-size:19px;margin-right:4px}
+.hero.green .stat .ic.em,.hero.intro .hero-sec .eyebrow .ic.em{font-size:15px}
+.medal-em{font-size:22px;line-height:1;vertical-align:-3px}
+.prize .medal .medal-em{font-size:28px}
