@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>클럽 페어웨이 운영진</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="img/logo.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="style.css">
+<style>
+  #app{padding-bottom:24px}
+  .adminbar{background:var(--gold-soft);color:var(--text);border-radius:12px;padding:10px 14px;font-size:13.5px;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+  .quick{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:14px}
+  .quick a{display:flex;flex-direction:column;gap:6px;padding:14px;border-radius:14px;background:var(--surface);border:1px solid var(--line);text-decoration:none;color:inherit;box-shadow:var(--shadow)}
+  .quick a .k{font-size:12px;color:var(--muted)}
+  .quick a .v{font-weight:700;display:flex;align-items:center;gap:6px}
+  .quick a.primary{background:var(--green);color:var(--green-ink);border-color:transparent}
+  .quick a.primary .k{color:inherit;opacity:.75}
+  .issue{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line)}
+  .issue:last-child{border-bottom:0}
+  .issue .ic{color:var(--warn);margin-top:2px}
+  .issue.ok .ic{color:var(--ok)}
+  .guide dt{font-weight:700;margin-top:10px}
+  .guide dd{margin:2px 0 0;color:var(--muted);font-size:13.5px}
+  .loading{padding:40px 10px;text-align:center;color:var(--muted)}
+  .kbd{font-family:"Barlow Condensed",monospace;background:var(--surface2);padding:1px 6px;border-radius:5px;font-size:12px}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <a class="logo" href="./">
+      <img class="badge" src="img/logo.png" alt="클럽 페어웨이 엠블럼">
+      <div class="logotype"><div class="top">CLUB</div><div class="big">FAIRWAY</div><div class="slogan">운영진 페이지</div></div>
+    </a>
+    <div class="tourtag">ADMIN</div>
+  </header>
+  <div class="adminbar"><span>이 페이지는 운영진용입니다. 데이터 입력은 구글 시트에서 하고, 여기서는 점검·확인만 합니다.</span><a class="btn small" href="./">회원 화면 보기</a></div>
+  <main id="view"><div class="loading">불러오는 중…</div></main>
+</div>
+<script src="config.js"></script>
+<script src="app.js"></script>
+<script>
+(async function(){
+  const C = window.CF, CFG = C.CFG, view = document.getElementById('view');
+  const sheetUrl = `https://docs.google.com/spreadsheets/d/${CFG.sheetId}/edit`;
+  const tabLink = (name) => `<a href="${sheetUrl}" target="_blank" rel="noopener">${name} 탭</a>`;
+  let S;
+  try{ S = await C.loadData(); }catch(err){ S = null; }
+  const parts = [];
+  parts.push(`<div class="quick">
+    <a class="primary" href="${sheetUrl}" target="_blank" rel="noopener"><span class="k">데이터 입력</span><span class="v">${C.ic('link')}운영 시트 열기</span></a>
+    <a href="./" target="_blank" rel="noopener"><span class="k">회원에게 보이는 화면</span><span class="v">${C.ic('users')}회원 화면</span></a>
+    ${CFG.roundFormUrl ? `<a href="${C.esc(CFG.roundFormUrl)}" target="_blank" rel="noopener"><span class="k">회원 제출용</span><span class="v">${C.ic('flag')}플레이 날짜 폼</span></a>` : ''}
+  </div>`);
+
+  // ---- checks ----
+  const issues = [];
+  if(!S){
+    issues.push({lvl:'warn', text:`시트를 읽지 못했습니다. 시트 공유가 <b>"링크가 있는 모든 사용자 · 뷰어"</b>로 되어 있는지, config.js의 sheetId가 맞는지 확인하세요.`});
+  } else {
+    if(S.errors.length) issues.push({lvl:'warn', text:`읽지 못한 탭: ${S.errors.join(', ')} — 탭 이름이 바뀌었는지 확인하세요.`});
+    const e = C.currentEvent(S);
+    if(!S.events.length) issues.push({lvl:'warn', text:`등록된 대회가 없습니다. ${tabLink('대회')}에 대회를 추가하세요.`});
+    const live = S.events.filter(x => x.status==='진행중'); if(live.length > 1) issues.push({lvl:'warn', text:`진행중인 대회가 ${live.length}개입니다. 회원 화면에는 첫 번째만 보입니다.`});
+    S.events.forEach(x => { if(!['모집중','진행중','종료'].includes(x.status)) issues.push({lvl:'warn', text:`"${C.esc(x.title)}" 상태값 "${C.esc(x.status)}"이(가) 잘못됐습니다. 모집중/진행중/종료 중 하나로.`}); if(!x.date) issues.push({lvl:'warn', text:`"${C.esc(x.title)}" 시작일이 비어 있거나 형식이 잘못됐습니다 (예: 2026-09-21).`}); });
+    const ids = new Set(S.events.map(x=>x.id));
+    const badRef = (list, label) => list.filter(x => x.eventId && !ids.has(x.eventId)).map(x => x.eventId);
+    [['접수',S.entries],['라운드',S.rounds],['기록부문',S.leaders],['최종결과',S.scores],['시상',S.prizes]].forEach(([n,l]) => { const b = [...new Set(badRef(l))]; if(b.length) issues.push({lvl:'warn', text:`${n} 탭에 없는 대회ID가 있습니다: ${b.map(C.esc).join(', ')} (대회 탭의 대회ID와 같아야 합니다)`}); });
+    const unknown = new Set(); [S.entries, S.rounds, S.scores].forEach(l => l.forEach(x => { if(!S.member(x.name)) unknown.add(x.name); }));
+    if(unknown.size) issues.push({lvl:'warn', text:`회원 탭에 없는 이름: ${[...unknown].map(C.esc).join(', ')} → 회원 탭에 추가하거나(골프존 닉네임 포함) 이름을 맞춰 주세요. 등급 배지가 표시되지 않습니다.`});
+    S.members.forEach(m => { if(m.hcp == null) issues.push({lvl:'info', text:`${C.esc(m.name)} — G핸디가 비어 있어 등급이 표시되지 않습니다.`}); });
+    if(e){
+      const unpaid = C.entriesOf(S,e).filter(n=>!n.paid);
+      if(unpaid.length) issues.push({lvl:'info', text:`${C.esc(e.title)} 입금 대기 ${unpaid.length}명: ${unpaid.map(n=>C.esc(S.display(n.name))).join(', ')}`});
+      if(e.status==='종료' && !C.scoresOf(S,e).length) issues.push({lvl:'warn', text:`"${C.esc(e.title)}"이(가) 종료 상태인데 최종결과가 없습니다. ${tabLink('최종결과')}에 골프존 대회 통계를 입력하세요.`});
+      if(e.status==='진행중'){ const st = C.roundStats(S,e); const last = st.map(x=>x.last).sort().pop(); if(last){ const days = Math.floor((Date.now() - new Date(last+'T00:00:00')) / 86400000); if(days >= 3) issues.push({lvl:'info', text:`마지막 라운드 등록이 ${days}일 전입니다. 회원들이 보낸 결과 화면을 ${tabLink('라운드')}에 반영해 주세요.`}); } }
+    }
+  }
+  parts.push(`<section><div class="sec-head"><h2>${C.ic('check')}점검</h2><span class="meta">${new Date().toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})} 기준</span></div><div class="card" style="padding:4px 16px">${issues.length ? issues.map(i => `<div class="issue ${i.lvl==='ok'?'ok':''}">${C.ic(i.lvl==='info'?'info':'warn')}<div>${i.text}</div></div>`).join('') : `<div class="issue ok">${C.ic('check')}<div>문제 없음. 회원 화면이 정상적으로 표시됩니다.</div></div>`}</div></section>`);
+
+  if(S){
+    const e = C.currentEvent(S);
+    // ---- overview ----
+    parts.push(`<section><div class="sec-head"><h2>${C.ic('calendar')}대회</h2><span class="meta">${S.events.length}개 · 회원 ${S.members.length}명</span></div><div class="list">${S.events.sort((a,b)=>b.date.localeCompare(a.date)).map(x => `<div class="item"><div class="top"><div><div class="title">${C.esc(x.title)}</div><div class="meta">${C.period(x)} · ID ${C.esc(x.id)}</div></div>${C.statusPill(x.status)}</div><div class="chips"><span class="tag">접수 ${C.entriesOf(S,x).length}명 · 입금 ${C.entriesOf(S,x).filter(n=>n.paid).length}명</span><span class="tag">라운드 ${C.roundsOf(S,x).length}</span><span class="tag">최종결과 ${C.scoresOf(S,x).length}명</span></div></div>`).join('') || '<div class="empty">대회가 없습니다.</div>'}</div></section>`);
+    if(e){
+      parts.push(`<section><div class="sec-head"><h2>${C.ic('users')}${C.esc(e.title)} 접수 현황</h2><span class="meta">${C.entriesOf(S,e).length}명</span></div>${C.entriesOf(S,e).length ? `<div class="card" style="padding:6px 16px">${C.entriesOf(S,e).map(n => `<div class="check"><span class="grow name">${C.esc(S.display(n.name))}${C.gradeChip(S.member(n.name))}${n.memo?`<div class="sub">💬 ${C.esc(n.memo)}</div>`:''}${!S.member(n.name)?'<div class="sub" style="color:var(--warn)">회원 탭에 없음</div>':''}</span>${n.paid ? '<span class="tag paid">입금 확인</span>' : '<span class="tag unpaid">입금 대기</span>'}</div>`).join('')}</div>` : '<div class="empty">접수가 없습니다.</div>'}</section>`);
+      if(C.roundsOf(S,e).length) parts.push(`<section><div class="sec-head"><h2>${C.ic('flag')}참여 현황</h2><span class="meta">${C.roundsOf(S,e).length} 라운드</span></div>${C.participationHtml(S,e)}</section><section><div class="sec-head"><h2>${C.ic('star')}기록 부문 (회원 화면 미리보기)</h2></div>${C.leaderBoardHtml(S,e) || '<div class="empty">없음</div>'}</section>`);
+    }
+    // ---- members ----
+    parts.push(`<section><div class="sec-head"><h2>${C.ic('list')}회원 명단</h2><span class="meta">${S.members.length}명</span></div>${S.members.length ? `<div class="card" style="padding:4px 8px"><div class="tbl-wrap"><table><thead><tr><th>이름</th><th>골프존 닉네임</th><th class="r">G핸디</th><th>등급</th></tr></thead><tbody>${[...S.members].sort((a,b)=>a.name.localeCompare(b.name,'ko')).map(m => `<tr><td class="name">${C.esc(m.name)}</td><td class="sub">${C.esc(m.gzNick||'—')}</td><td class="num r">${C.ghcp(m.hcp)||'—'}</td><td>${C.gradeChip(m)||'<span class="sub">—</span>'}</td></tr>`).join('')}</tbody></table></div></div>` : '<div class="empty">회원이 없습니다. 회원 탭에 추가하세요.</div>'}</section>`);
+  }
+
+  // ---- guide ----
+  parts.push(`<section><div class="sec-head"><h2>${C.ic('info')}운영 순서</h2></div><div class="card guide"><dl style="margin:0">
+    <dt>1. 대회 개설</dt><dd>시트 <b>대회</b> 탭에 한 줄 추가: 대회ID(예: E2) · 대회명 · 시작일 · 종료일 · 참가비 · 상태 <span class="kbd">모집중</span> · 요강. 포스터는 사이트 <span class="kbd">img/</span> 폴더에 올리고 파일명을 적습니다.</dd>
+    <dt>2. 참가 접수</dt><dd>회원이 보낸 신청 양식을 보고 <b>회원</b> 탭(처음 참가자만)과 <b>접수</b> 탭에 입력. 입금 확인되면 접수 탭 입금을 <span class="kbd">완료</span>로.</dd>
+    <dt>3. 대회 시작</dt><dd>대회 탭 상태를 <span class="kbd">진행중</span>으로. 회원 화면에 기록 부문·참여 현황이 나타납니다.</dd>
+    <dt>4. 매일 반영</dt><dd>회원이 보낸 결과 화면을 보고 <b>라운드</b> 탭에 이름·플레이날짜(+실타·버디·파·보기·양파) 추가. 롱기스트·니어핀·홀인원은 <b>기록부문</b> 탭에 이름과 기록을 적습니다.</dd>
+    <dt>5. 대회 종료</dt><dd>골프존 대회 통계를 <b>최종결과</b> 탭에 입력(순위·이름·실타·보정타·버디), 롱기스트 등 추가 시상은 <b>시상</b> 탭에. 상태를 <span class="kbd">종료</span>로 바꾸면 최종 순위와 시상이 표시됩니다.</dd>
+    <dt>이름 규칙</dt><dd>모든 탭의 이름은 회원 탭의 <b>이름</b> 또는 <b>골프존 닉네임</b>과 같아야 합니다. 둘 중 무엇을 써도 회원 이름으로 표시됩니다.</dd>
+    <dt>등급</dt><dd>G핸디만 넣으면 실력등급·세부등급이 자동 산정됩니다(독수리 0 미만 · 매 0~+7 · 학 +8~+17 · 까치 +18~+27 · 참새 +28 이상). 골프존 앱과 다르면 회원 탭 실력등급·세부등급 칸에 직접 적으면 그 값이 우선합니다.</dd>
+  </dl></div></section>`);
+  parts.push(C.footerHtml());
+  view.innerHTML = parts.join('');
+})();
+</script>
+</body>
+</html>
