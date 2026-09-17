@@ -1,7 +1,8 @@
 /* 클럽 페어웨이 스크린 투어 — 공용 스크립트 (시트 읽기 · 계산 · 렌더 조각) */
 (function(){
   const CFG = window.CF_CONFIG || {};
-  const SHEETS = ['대회','회원','접수','라운드','기록부문','최종결과','시상','협찬'];
+  const SHEETS = ['대회','접수','라운드','기록부문','최종결과','시상','협찬','회원'];
+  const OPTIONAL = ['회원','시상','협찬'];
 
   // ---------- utils ----------
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -48,18 +49,33 @@
     const raw = {};
     const results = await Promise.allSettled(SHEETS.map(fetchSheet));
     const errors = [];
-    results.forEach((res, i) => { if(res.status === 'fulfilled') raw[SHEETS[i]] = res.value; else { raw[SHEETS[i]] = []; errors.push(SHEETS[i]); } });
-    if(errors.length === SHEETS.length) throw new Error('시트를 읽지 못했습니다');
+    results.forEach((res, i) => { if(res.status === 'fulfilled') raw[SHEETS[i]] = res.value; else { raw[SHEETS[i]] = []; if(!OPTIONAL.includes(SHEETS[i])) errors.push(SHEETS[i]); } });
+    if(results.every(r => r.status !== 'fulfilled')) throw new Error('시트를 읽지 못했습니다');
     const S = { errors };
     S.events = raw['대회'].filter(o=>!isExample(o)).map(o => ({ id: col(o,'대회ID','ID'), title: col(o,'대회명'), date: isoDate(col(o,'시작일','일자')), endDate: isoDate(col(o,'종료일')), fee: num(col(o,'참가비'))||0, status: col(o,'상태')||'모집중', deadline: isoDate(col(o,'접수마감')), poster: col(o,'포스터파일','포스터'), brief: col(o,'요강') })).filter(e => e.id && e.title);
     S.members = raw['회원'].filter(o=>!isExample(o)).map(o => { const hcp = num(col(o,'G핸디','핸디')); const auto = gradeFromHcp(hcp); return { name: col(o,'모임닉네임','회원닉네임','이름'), gzNick: col(o,'골프존닉네임','골프존'), hcp, grade: col(o,'실력등급') || auto.grade, tier: col(o,'세부등급') || auto.tier, note: col(o,'비고') }; }).filter(m => m.name);
-    S.entries = raw['접수'].filter(o=>!isExample(o)).map(o => ({ eventId: col(o,'대회ID','ID'), name: col(o,'모임닉네임','닉네임','이름'), paid: /완료|확인|입금됨|O|o|✓/.test(col(o,'입금')), date: isoDate(col(o,'접수일','타임스탬프')), memo: col(o,'하고싶은말','메모','한마디') })).filter(x => x.name);
-    S.rounds = raw['라운드'].filter(o=>!isExample(o)).map(o => ({ eventId: col(o,'대회ID','ID'), name: col(o,'모임닉네임','닉네임','이름'), date: isoDate(col(o,'플레이날짜','날짜','타임스탬프')), gross: num(col(o,'실타','타수','스코어')), birdies: num(col(o,'버디')), pars: num(col(o,'파')), bogeys: num(col(o,'보기')), doubles: num(col(o,'양파','더블')), note: col(o,'비고') })).filter(x => x.name && x.date);
+    S.entries = raw['접수'].filter(o=>!isExample(o)).map(o => ({ eventId: col(o,'대회ID','ID'), name: col(o,'모임닉네임','회원닉네임','이름'), gzNick: col(o,'골프존닉네임','골프존'), hcp: num(col(o,'G핸디','핸디')), grade: col(o,'실력등급'), tier: col(o,'세부등급'), paid: /완료|확인|입금됨|O|o|✓/.test(col(o,'입금')), date: isoDate(col(o,'접수일','타임스탬프')), memo: col(o,'하고싶은말','메모','한마디') })).filter(x => x.name);
+    S.rounds = raw['라운드'].filter(o=>!isExample(o)).map(o => ({ eventId: col(o,'대회ID','ID'), name: col(o,'모임닉네임','닉네임','이름'), date: isoDate(col(o,'플레이날짜','날짜','타임스탬프')), gross: num(col(o,'실타','타수','스코어')), net: num(col(o,'보정타','보정')), birdies: num(col(o,'버디')), pars: num(col(o,'파')), bogeys: num(col(o,'보기')), doubles: num(col(o,'양파','더블')), note: col(o,'비고') })).filter(x => x.name && x.date);
     S.leaders = raw['기록부문'].filter(o=>!isExample(o)).map(o => ({ eventId: col(o,'대회ID','ID'), cat: col(o,'부문'), name: col(o,'모임닉네임','닉네임','이름'), value: col(o,'기록') })).filter(x => x.cat);
     S.scores = raw['최종결과'].filter(o=>!isExample(o)).map(o => ({ eventId: col(o,'대회ID','ID'), rank: num(col(o,'순위')), name: col(o,'모임닉네임','닉네임','이름'), gross: num(col(o,'실타')), net: num(col(o,'보정타','보정')), birdies: num(col(o,'버디'))||0 })).filter(x => x.name && x.gross != null).map(x => ({...x, net: x.net ?? x.gross}));
     S.prizes = raw['시상'].filter(o=>!isExample(o)).map(o => ({ eventId: col(o,'대회ID','ID'), title: col(o,'시상명','부문'), name: col(o,'모임닉네임','닉네임','수상자','이름'), item: col(o,'부상','협찬품') })).filter(x => x.title);
     S.sponsors = raw['협찬'].filter(o=>!isExample(o)).map(o => ({ eventId: col(o,'대회ID','ID'), name: col(o,'협찬자','협찬사'), item: col(o,'품목'), qty: num(col(o,'수량'))||1 })).filter(x => x.name);
-    // 라운드/접수/결과에 있는데 회원 명단에 없는 이름 → 임시 회원으로 취급(닉네임 매칭 포함)
+    // 대회ID가 대회 탭에 없으면 현재 대회로 자동 배정 (운영진 페이지에서 경고 표시)
+    const ids = new Set(S.events.map(e=>e.id));
+    const fallback = (S.events.find(e=>e.status==='진행중') || S.events.find(e=>e.status==='모집중') || S.events[0] || {}).id;
+    S.badIds = [];
+    [S.entries, S.rounds, S.leaders, S.scores, S.prizes].forEach(list => list.forEach(x => { if(x.eventId && !ids.has(x.eventId)){ S.badIds.push(x.eventId); if(fallback) x.eventId = fallback; } else if(!x.eventId && fallback) x.eventId = fallback; }));
+    S.badIds = [...new Set(S.badIds)];
+    // 접수 탭에서 회원 정보 보강: 회원 탭이 없어도 접수 내역만으로 명단 구성
+    const byName = {}; S.members.forEach(m => byName[m.name] = m);
+    S.entries.forEach(n => {
+      let m = byName[n.name] || Object.values(byName).find(x => x.gzNick && x.gzNick === n.name);
+      if(!m){ m = {name:n.name, gzNick:'', hcp:null, grade:'', tier:'', note:''}; byName[n.name] = m; S.members.push(m); }
+      if(n.gzNick && !m.gzNick) m.gzNick = n.gzNick;
+      if(n.hcp != null){ m.hcp = n.hcp; }
+      if(n.grade) m.grade = n.grade; if(n.tier) m.tier = n.tier;
+    });
+    S.members.forEach(m => { if(m.hcp != null && (!m.grade || !m.tier)){ const a = gradeFromHcp(m.hcp); m.grade = m.grade || a.grade; m.tier = m.tier || a.tier; } });
     S.memberByName = {};
     S.members.forEach(m => { S.memberByName[m.name] = m; if(m.gzNick) S.memberByName[m.gzNick] = m; });
     S.member = n => S.memberByName[n] || null;
@@ -156,16 +172,10 @@
   // ---------- render fragments ----------
   function heroHtml(S,e){
     if(!e) return `<div class="hero green">${CONTOUR}<img class="badge-big" src="img/logo.png" alt=""><div class="eyebrow" style="text-align:center">현재 대회</div><h1 style="text-align:center">첫 대회를 준비하고 있습니다</h1><p class="meta" style="text-align:center">운영진이 대회를 등록하면 이 화면에서 바로 확인할 수 있습니다.</p></div>`;
-    const ens = entriesOf(S,e), paid = ens.filter(n=>n.paid).length, rn = roundsOf(S,e).length;
     return `<div class="hero green">${CONTOUR}
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div class="eyebrow">현재 대회 · ${esc(CFG.season||'')} 시즌</div>${statusPill(e.status)}</div>
       <h1>${esc(e.title)}</h1>
       <div class="meta">${period(e)} · 참가비 ${won(e.fee)}</div>
-      <div class="stats">
-        <div class="stat">${ic('users')}<div class="v">${ens.length}</div><div class="l">참가 접수</div></div>
-        <div class="stat">${ic('check')}<div class="v">${paid}</div><div class="l">입금 확인</div></div>
-        <div class="stat">${ic('flag')}<div class="v">${e.status==='종료' ? scoresOf(S,e).length : rn}</div><div class="l">${e.status==='종료' ? '최종 결과' : '라운드'}</div></div>
-      </div>
       ${e.poster ? `<img class="poster-full" style="margin-top:14px" src="${esc(posterUrl(e.poster))}" alt="${esc(e.title)} 포스터">` : ''}
       ${entryOpen(e) ? `<div class="notice"><span>${e.status==='진행중' ? '대회 기간 중 언제든 참가할 수 있습니다. 라운드 후 결과 화면을 운영진에게 보내주세요.' : '참가 신청과 입금은 운영진에게 알려주세요. 입금 확인 후 참가가 확정됩니다.'}${e.deadline ? ` 접수 마감 ${fmtDate(e.deadline)}.` : ''}</span><a class="btn small" href="#apply">신청 양식 보기</a></div>` : ''}
     </div>`;
@@ -179,6 +189,38 @@
   function leaderBoardHtml(S,e){
     const rows = leaderRows(S,e); if(!rows.some(r=>r.lead)) return '';
     return `<div class="card" style="padding:4px 16px">${rows.map(r => `<div class="prize"><div class="medal ${r.cat==='최다참가'?'g':''}">${ic(r.icon)}</div><div><div class="t">${esc(r.cat)}</div><div class="w">${r.lead ? esc(r.lead.name) : '<span class="sub">아직 없음</span>'}</div></div><div class="i">${r.lead ? esc(r.lead.value||'') : ''}</div></div>`).join('')}</div>`;
+  }
+  function liveRows(S,e){
+    const acc = {};
+    roundsOf(S,e).forEach(r => { if(r.gross == null) return; const k = S.display(r.name); const net = r.net ?? r.gross; const a = acc[k] = acc[k] || {name:k, n:0, bestNet:null, bestGross:null, birdies:0, last:''}; a.n++; a.birdies += r.birdies||0; if(r.date > a.last) a.last = r.date; if(a.bestNet == null || net < a.bestNet || (net === a.bestNet && r.gross < a.bestGross)){ a.bestNet = net; a.bestGross = r.gross; } });
+    const rows = Object.values(acc).sort((a,b) => a.bestNet-b.bestNet || a.bestGross-b.bestGross || b.n-a.n || a.name.localeCompare(b.name,'ko'));
+    let rank = 0; rows.forEach((r,i) => { if(i===0 || r.bestNet !== rows[i-1].bestNet) rank = i+1; r.rank = rank; });
+    return rows;
+  }
+  function liveBoardHtml(S,e){
+    const rows = liveRows(S,e);
+    if(!rows.length) return `<div class="empty illus">${EMPTY_SVG}첫 라운드 결과가 등록되면 현재 순위가 표시됩니다.</div>`;
+    const hasNet = rows.some(r => r.bestNet !== r.bestGross);
+    return `<div class="card" style="padding:4px 8px"><div class="tbl-wrap"><table><thead><tr><th></th><th>참가자</th>${hasNet?'<th class="r">보정</th>':''}<th class="r">베스트</th><th class="r">라운드</th></tr></thead><tbody>${rows.map(r => `<tr class="${r.rank===1?'p1':''}"><td class="rank r${r.rank}">${r.rank<=3 ? MEDAL(r.rank) : r.rank}</td><td class="name">${esc(r.name)}${gradeChip(S.member(r.name))}<div class="sub">${fmtDate(r.last)}${r.birdies?` · 버디 ${r.birdies}`:''}</div></td>${hasNet?`<td class="num r" style="color:var(--green)">${r.bestNet}</td>`:''}<td class="num r">${r.bestGross}</td><td class="r sub">${r.n}</td></tr>`).join('')}</tbody></table></div></div><p class="meta" style="margin-top:8px">회원별 베스트 스코어 기준 · 운영진이 라운드를 등록할 때마다 갱신됩니다. 최종 순위는 대회 종료 후 골프존 대회 통계로 확정합니다.</p>`;
+  }
+  function manualLead(S,e,pattern){ const l = S.leaders.find(x => x.eventId === e.id && pattern.test(x.cat.replace(/\s/g,''))); return l && l.name ? {name:S.display(l.name), value:l.value} : null; }
+  function liveSummaryHtml(S,e){
+    const rows = liveRows(S,e), st = roundStats(S,e);
+    const hasNet = rows.some(r => r.bestNet !== r.bestGross);
+    const most = st[0] && st[0].n ? {name:st[0].name, value:`${st[0].n}회`} : null;
+    const byGrade = {};
+    rows.forEach(r => { const m = S.member(r.name); const g = m && m.grade ? m.grade : '등급 미정'; if(!byGrade[g]) byGrade[g] = r; });
+    const gradeOrder = [...GRADES.map(g=>g[0]), '등급 미정'].filter(g => byGrade[g]);
+    const item = (icon, title, lead, gold) => `<div class="prize"><div class="medal ${gold?'g':''}">${icon}</div><div><div class="t">${esc(title)}</div><div class="w">${lead ? esc(lead.name) : '<span class="sub">아직 없음</span>'}</div></div><div class="i">${lead ? esc(lead.value||'') : ''}</div></div>`;
+    const gradeItems = gradeOrder.map(g => { const r = byGrade[g]; const m = S.member(r.name); const chip = m && m.grade ? gradeChip({grade:m.grade, tier:''}).replace('margin-left:6px','') : ''; return `<div class="prize"><div class="medal">${MEDAL(1)}</div><div><div class="t">${esc(g)} 1위</div><div class="w">${esc(r.name)}${m ? gradeChip(m) : ''}</div></div><div class="i">${hasNet ? `보정 ${r.bestNet} <span class="sub">(실타 ${r.bestGross})</span>` : `${r.bestGross}타`}<div class="sub">${r.n}라운드</div></div></div>`; }).join('');
+    if(!rows.length && !most && !manualLead(S,e,/롱기/) && !manualLead(S,e,/니어/)) return `<div class="empty illus">${EMPTY_SVG}첫 라운드 결과가 등록되면 현황이 표시됩니다.</div>`;
+    return `<div class="card" style="padding:4px 16px">
+      ${item(ic('fire'), '최다참여', most, true)}
+      ${gradeItems || `<div class="prize"><div class="medal">${ic('flag')}</div><div><div class="t">등급별 1위</div><div class="w"><span class="sub">아직 없음</span></div></div></div>`}
+      ${item(ic('target'), '롱기스트 (남)', manualLead(S,e,/롱기.*남/))}
+      ${item(ic('target'), '롱기스트 (여)', manualLead(S,e,/롱기.*여/))}
+      ${item(ic('target'), '니어핀', manualLead(S,e,/니어/))}
+    </div><p class="meta" style="margin-top:8px">등급별 1위는 회원별 베스트 스코어 기준. 운영진이 라운드·기록을 등록할 때마다 갱신되며, 최종 순위는 대회 종료 후 골프존 대회 통계로 확정합니다.</p>`;
   }
   function participationHtml(S,e){
     const st = roundStats(S,e); if(!st.length) return `<div class="empty">아직 등록된 라운드가 없습니다. 플레이 후 운영진에게 알려주세요.</div>`;
@@ -214,5 +256,5 @@
   });
   let toastT; function toast(msg){ let t = document.getElementById('toast'); if(!t){ t = document.createElement('div'); t.id = 'toast'; t.className = 'toast'; document.body.appendChild(t); } t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(()=>t.classList.remove('show'), 2200); }
 
-  window.CF = { CFG, esc, won, num, isoDate, fmtDate, period, loadData, gradeFromHcp, gradeChip, ghcp, ic, MEDAL, EMPTY_SVG, CONTOUR, statusPill, entryOpen, posterUrl, entriesOf, roundsOf, scoresOf, currentEvent, board, roundStats, leaderRows, autoPrizes, heroHtml, briefHtml, leaderBoardHtml, participationHtml, participantsHtml, boardHtml, prizesHtml, sponsorsHtml, footerHtml, toast, GRADES, TIERS };
+  window.CF = { CFG, esc, won, num, isoDate, fmtDate, period, loadData, gradeFromHcp, gradeChip, ghcp, ic, MEDAL, EMPTY_SVG, CONTOUR, statusPill, entryOpen, posterUrl, entriesOf, roundsOf, scoresOf, currentEvent, board, roundStats, leaderRows, autoPrizes, heroHtml, briefHtml, leaderBoardHtml, participationHtml, liveBoardHtml, liveSummaryHtml, liveRows, participantsHtml, boardHtml, prizesHtml, sponsorsHtml, footerHtml, toast, GRADES, TIERS };
 })();
