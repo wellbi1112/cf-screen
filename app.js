@@ -52,7 +52,7 @@
     results.forEach((res, i) => { if(res.status === 'fulfilled') raw[SHEETS[i]] = res.value; else { raw[SHEETS[i]] = []; if(!OPTIONAL.includes(SHEETS[i])) errors.push(SHEETS[i]); } });
     if(results.every(r => r.status !== 'fulfilled')) throw new Error('시트를 읽지 못했습니다');
     const S = { errors };
-    S.events = raw['대회'].filter(o=>!isExample(o)).map(o => ({ id: col(o,'대회ID','ID'), title: col(o,'대회명'), date: isoDate(col(o,'시작일','일자')), endDate: isoDate(col(o,'종료일')), fee: num(col(o,'참가비'))||0, status: col(o,'상태')||'모집중', deadline: isoDate(col(o,'접수마감')), poster: col(o,'포스터파일','포스터'), brief: col(o,'요강') })).filter(e => e.id && e.title);
+    S.events = raw['대회'].filter(o=>!isExample(o)).map(o => ({ id: col(o,'대회ID','ID'), title: col(o,'대회명'), date: isoDate(col(o,'시작일','일자')), endDate: isoDate(col(o,'종료일')), fee: num(col(o,'참가비'))||0, status: /종료|완료|끝/.test(col(o,'상태')) ? '종료' : '진행중', deadline: isoDate(col(o,'접수마감')), poster: col(o,'포스터파일','포스터'), brief: col(o,'요강') })).filter(e => e.id && e.title);
     S.members = raw['회원'].filter(o=>!isExample(o)).map(o => { const hcp = num(col(o,'G핸디','핸디')); const auto = gradeFromHcp(hcp); return { name: col(o,'모임닉네임','회원닉네임','이름'), gzNick: col(o,'골프존닉네임','골프존'), hcp, grade: col(o,'실력등급') || auto.grade, tier: col(o,'세부등급') || auto.tier, note: col(o,'비고') }; }).filter(m => m.name);
     S.entries = raw['접수'].filter(o=>!isExample(o)).map(o => ({ eventId: col(o,'대회ID','ID'), name: col(o,'모임닉네임','회원닉네임','이름'), gzNick: col(o,'골프존닉네임','골프존'), hcp: num(col(o,'G핸디','핸디')), grade: col(o,'실력등급'), tier: col(o,'세부등급'), paid: /완료|확인|입금됨|O|o|✓/.test(col(o,'입금')), date: isoDate(col(o,'접수일','타임스탬프')), memo: col(o,'하고싶은말','메모','한마디') })).filter(x => x.name);
     S.rounds = raw['라운드'].filter(o=>!isExample(o)).map(o => ({ eventId: col(o,'대회ID','ID'), name: col(o,'모임닉네임','닉네임','이름'), date: isoDate(col(o,'플레이날짜','날짜','타임스탬프')), gross: num(col(o,'실타','타수','스코어')), net: num(col(o,'보정타','보정')), birdies: num(col(o,'버디')), pars: num(col(o,'파')), bogeys: num(col(o,'보기')), doubles: num(col(o,'양파','더블')), note: col(o,'비고') })).filter(x => x.name && x.date);
@@ -62,7 +62,7 @@
     S.sponsors = raw['협찬'].filter(o=>!isExample(o)).map(o => ({ eventId: col(o,'대회ID','ID'), name: col(o,'협찬자','협찬사'), item: col(o,'품목'), qty: num(col(o,'수량'))||1 })).filter(x => x.name);
     // 대회ID가 대회 탭에 없으면 현재 대회로 자동 배정 (운영진 페이지에서 경고 표시)
     const ids = new Set(S.events.map(e=>e.id));
-    const fallback = (S.events.find(e=>e.status==='진행중') || S.events.find(e=>e.status==='모집중') || S.events[0] || {}).id;
+    const fallback = (S.events.find(e=>e.status!=='종료') || S.events[0] || {}).id;
     S.badIds = [];
     [S.entries, S.rounds, S.leaders, S.scores, S.prizes].forEach(list => list.forEach(x => { if(x.eventId && !ids.has(x.eventId)){ S.badIds.push(x.eventId); if(fallback) x.eventId = fallback; } else if(!x.eventId && fallback) x.eventId = fallback; }));
     S.badIds = [...new Set(S.badIds)];
@@ -122,8 +122,8 @@
   const MEDAL = n => { const c = {1:['#f2c14e','#b8862b'],2:['#d9dde3','#8c949c'],3:['#e2a065','#a0622a']}[n]; return `<svg class="medal-svg" viewBox="0 0 28 28" aria-label="${n}위"><path d="M9 2h4l2 6-4 3zM19 2h-4l-2 6 4 3z" fill="${c[1]}"/><circle cx="14" cy="17" r="8" fill="${c[0]}" stroke="${c[1]}" stroke-width="1.5"/><text x="14" y="21" text-anchor="middle" font-family="Barlow Condensed,sans-serif" font-weight="800" font-size="11" fill="${c[1]}">${n}</text></svg>`; };
   const EMPTY_SVG = `<svg viewBox="0 0 120 80" aria-hidden="true"><ellipse cx="60" cy="66" rx="44" ry="9" fill="var(--green-soft)"/><path d="M60 62V12" stroke="var(--muted)" stroke-width="2"/><path d="M60 12h22l-6 8 6 8H60z" fill="var(--live)"/><circle cx="46" cy="60" r="4.5" fill="#fff" stroke="var(--line)"/></svg>`;
   const CONTOUR = `<svg class="contour" viewBox="0 0 400 200" preserveAspectRatio="none" aria-hidden="true"><g fill="none" stroke="#fff" stroke-width="1.2"><path d="M-20 150c60-40 120-40 180-10s120 30 260-20"/><path d="M-20 170c60-40 120-40 180-10s120 30 260-20"/><path d="M-20 190c60-40 120-40 180-10s120 30 260-20"/><path d="M220 40c40-30 90-30 200-10"/><path d="M240 60c40-30 90-30 180-10"/></g></svg>`;
-  const statusPill = st => st==='진행중' ? '<span class="pill live">LIVE</span>' : st==='모집중' ? '<span class="pill open">모집중</span>' : '<span class="pill done">종료</span>';
-  const entryOpen = e => e.status==='모집중' || e.status==='진행중';
+  const statusPill = st => st==='종료' ? '<span class="pill done">종료</span>' : '<span class="pill live">LIVE</span>';
+  const entryOpen = e => e.status!=='종료';
   const posterUrl = p => !p ? '' : (/^https?:\/\//.test(p) ? p : 'img/' + p);
 
   // ---------- computations ----------
@@ -131,8 +131,7 @@
   const roundsOf = (S,e) => S.rounds.filter(x => x.eventId === e.id);
   const scoresOf = (S,e) => S.scores.filter(x => x.eventId === e.id);
   function currentEvent(S){
-    const live = S.events.find(e => e.status === '진행중'); if(live) return live;
-    const open = S.events.filter(e => e.status === '모집중').sort((a,b)=>a.date.localeCompare(b.date))[0]; if(open) return open;
+    const live = S.events.filter(e => e.status !== '종료').sort((a,b)=>a.date.localeCompare(b.date))[0]; if(live) return live;
     return S.events.filter(e => e.status==='종료').sort((a,b)=>b.date.localeCompare(a.date))[0] || null;
   }
   function board(S,e){
@@ -172,20 +171,18 @@
   // ---------- render fragments ----------
   function heroHtml(S,e){
     if(!e) return `<div class="hero green">${CONTOUR}<img class="badge-big" src="img/logo.png" alt=""><div class="eyebrow" style="text-align:center">현재 대회</div><h1 style="text-align:center">첫 대회를 준비하고 있습니다</h1><p class="meta" style="text-align:center">운영진이 대회를 등록하면 이 화면에서 바로 확인할 수 있습니다.</p></div>`;
-    return `<div class="hero green">${CONTOUR}
+    const contact = CFG.contactUrl ? `<a href="${esc(CFG.contactUrl)}" target="_blank" rel="noopener">${esc(CFG.contactLabel||'운영진 카톡')}</a>` : '운영진 카톡';
+    return `<div class="hero green intro">${CONTOUR}
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div class="eyebrow">현재 대회 · ${esc(CFG.season||'')} 시즌</div>${statusPill(e.status)}</div>
       <h1>${esc(e.title)}</h1>
-      <div class="meta">${period(e)} · 참가비 ${won(e.fee)}</div>
+      <div class="meta">${period(e)} · 참가비 ${won(e.fee)}${e.deadline ? ` · 접수 마감 ${fmtDate(e.deadline)}` : ''}</div>
       ${e.poster ? `<img class="poster-full" style="margin-top:14px" src="${esc(posterUrl(e.poster))}" alt="${esc(e.title)} 포스터">` : ''}
-      ${entryOpen(e) ? `<div class="notice"><span>${e.status==='진행중' ? '대회 기간 중 언제든 참가할 수 있습니다. 라운드 후 결과 화면을 운영진에게 보내주세요.' : '참가 신청과 입금은 운영진에게 알려주세요. 입금 확인 후 참가가 확정됩니다.'}${e.deadline ? ` 접수 마감 ${fmtDate(e.deadline)}.` : ''}</span><a class="btn small" href="#apply">신청 양식 보기</a></div>` : ''}
+      <div class="hero-sec"><div class="eyebrow">${ic('info')} 대회 요강</div>${e.brief ? `<div class="brief">${esc(e.brief)}</div>` : (e.poster ? '<div class="brief sub">자세한 내용은 포스터를 참고하세요.</div>' : '<div class="brief sub">요강이 아직 등록되지 않았습니다.</div>')}<div class="sub" style="margin-top:8px">플레이 매장은 자유입니다. 결과는 골프존 대회 통계를 기준으로 운영진이 등록합니다.</div></div>
+      ${entryOpen(e) ? `<div class="hero-sec apply" id="apply"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px"><div class="eyebrow">${ic('users')} 참가 신청 양식</div><button class="btn small" data-copy="${esc(applyForm(e))}">양식 복사</button></div><pre class="brief">${esc(applyForm(e))}</pre><div class="sub" style="margin-top:8px">대회 기간 중 언제든 참가할 수 있습니다. 양식을 채워 ${contact}으로 보내주시면 운영진이 접수·입금 확인을 반영합니다. 라운드 후 결과 화면도 같은 곳으로 보내주세요.</div></div>` : ''}
     </div>`;
   }
   const applyForm = e => `[${e.title} 참가 신청]\n모임 닉네임: \n골프존 닉네임: \n골프존 G핸디: \n입금 여부: (참가비 ${won(e.fee)}) 입금 예정 / 입금 완료\n하고 싶은 말: `;
-  function briefHtml(S,e){
-    if(!e) return '';
-    const apply = entryOpen(e) ? `<div class="card" id="apply" style="margin-top:10px"><div class="sec-head" style="margin-bottom:6px"><h3 style="margin:0">참가 신청 양식</h3><button class="btn small" data-copy="${esc(applyForm(e))}">양식 복사</button></div><pre class="brief" style="margin:0;font-family:inherit;background:var(--surface2);padding:10px 12px;border-radius:10px">${esc(applyForm(e))}</pre><p class="meta" style="margin:8px 0 0">양식을 채워 ${CFG.contactUrl ? `<a href="${esc(CFG.contactUrl)}" target="_blank" rel="noopener">${esc(CFG.contactLabel||'운영진 카톡')}</a>` : '운영진 카톡'}으로 보내주세요. 운영진이 확인 후 접수·입금 확인을 반영합니다.</p></div>` : '';
-    return `<section><div class="sec-head"><h2>${ic('info')}대회 요강</h2><span class="meta">${period(e)}</span></div>${e.brief ? `<div class="card brief">${esc(e.brief)}</div>` : (e.poster ? '' : '<div class="empty">요강이 아직 등록되지 않았습니다.</div>')}<p class="meta" style="margin-top:8px">플레이 매장은 자유입니다. 결과는 골프존 대회 통계를 기준으로 운영진이 등록합니다.</p>${apply}</section>`;
-  }
+  function briefHtml(S,e){ return ''; }
   function leaderBoardHtml(S,e){
     const rows = leaderRows(S,e); if(!rows.some(r=>r.lead)) return '';
     return `<div class="card" style="padding:4px 16px">${rows.map(r => `<div class="prize"><div class="medal ${r.cat==='최다참가'?'g':''}">${ic(r.icon)}</div><div><div class="t">${esc(r.cat)}</div><div class="w">${r.lead ? esc(r.lead.name) : '<span class="sub">아직 없음</span>'}</div></div><div class="i">${r.lead ? esc(r.lead.value||'') : ''}</div></div>`).join('')}</div>`;
@@ -224,16 +221,16 @@
   }
   function participationHtml(S,e){
     const st = roundStats(S,e); if(!st.length) return `<div class="empty">아직 등록된 라운드가 없습니다. 플레이 후 운영진에게 알려주세요.</div>`;
-    return `<div class="card" style="padding:4px 8px"><div class="tbl-wrap"><table><thead><tr><th>참가자</th><th class="r">라운드</th><th class="r">최근 플레이</th><th class="r">베스트</th></tr></thead><tbody>${st.map((a,i) => `<tr class="${i===0?'p1':''}"><td class="name">${esc(a.name)}${gradeChip(S.member(a.name))}</td><td class="num r">${a.n}</td><td class="r sub">${fmtDate(a.last)}</td><td class="num r">${a.best ?? '—'}</td></tr>`).join('')}</tbody></table></div></div>`;
+    return `<div class="card scroll" style="padding:4px 8px"><div class="tbl-wrap"><table><thead><tr><th>참가자</th><th class="r">라운드</th><th class="r">최근 플레이</th><th class="r">베스트</th></tr></thead><tbody>${st.map((a,i) => `<tr class="${i===0?'p1':''}"><td class="name">${esc(a.name)}${gradeChip(S.member(a.name))}</td><td class="num r">${a.n}</td><td class="r sub">${fmtDate(a.last)}</td><td class="num r">${a.best ?? '—'}</td></tr>`).join('')}</tbody></table></div></div>`;
   }
   function participantsHtml(S,e){
     const ens = entriesOf(S,e); if(!ens.length) return '<div class="empty">아직 접수된 참가자가 없습니다.</div>';
-    return `<div class="card" style="padding:6px 16px">${ens.map(n => `<div class="check"><span class="grow name">${esc(S.display(n.name))}${gradeChip(S.member(n.name))}</span>${n.paid ? '<span class="tag paid">입금 확인</span>' : '<span class="tag unpaid">입금 대기</span>'}</div>`).join('')}</div>`;
+    return `<div class="card scroll" style="padding:6px 16px">${ens.map(n => `<div class="check"><span class="grow name">${esc(S.display(n.name))}${gradeChip(S.member(n.name))}</span>${n.paid ? '<span class="tag paid">입금 확인</span>' : '<span class="tag unpaid">입금 대기</span>'}</div>`).join('')}</div>`;
   }
   function boardHtml(S,e){
     const rows = board(S,e); if(!rows.length) return `<div class="empty illus">${EMPTY_SVG}최종 결과가 등록되면 순위가 표시됩니다.</div>`;
     const hasNet = rows.some(r => r.net !== r.gross);
-    return `<div class="tbl-wrap"><table><thead><tr><th></th><th>참가자</th><th class="r">실타</th>${hasNet?'<th class="r">보정타</th>':''}<th class="r">버디</th></tr></thead><tbody>${rows.map(r => `<tr class="${r.rank===1?'p1':''}"><td class="rank r${r.rank}">${r.rank<=3 ? MEDAL(r.rank) : r.rank}</td><td class="name">${esc(r.dname)}${gradeChip(S.member(r.name))}</td><td class="num r">${r.gross}</td>${hasNet?`<td class="num r" style="color:var(--green)">${r.net}</td>`:''}<td class="r">${r.birdies||0}</td></tr>`).join('')}</tbody></table></div>`;
+    return `<div class="tbl-wrap scroll"><table><thead><tr><th></th><th>참가자</th><th class="r">실타</th>${hasNet?'<th class="r">보정타</th>':''}<th class="r">버디</th></tr></thead><tbody>${rows.map(r => `<tr class="${r.rank===1?'p1':''}"><td class="rank r${r.rank}">${r.rank<=3 ? MEDAL(r.rank) : r.rank}</td><td class="name">${esc(r.dname)}${gradeChip(S.member(r.name))}</td><td class="num r">${r.gross}</td>${hasNet?`<td class="num r" style="color:var(--green)">${r.net}</td>`:''}<td class="r">${r.birdies||0}</td></tr>`).join('')}</tbody></table></div>`;
   }
   function prizesHtml(S,e){
     const auto = autoPrizes(S,e), manual = S.prizes.filter(p => p.eventId === e.id);
