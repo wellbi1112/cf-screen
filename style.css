@@ -54,9 +54,9 @@ header{display:flex;align-items:center;justify-content:space-between;padding-blo
 footer{margin-top:40px;text-align:center;color:var(--faint);font-size:12px}
 footer img{width:72px;opacity:.9;display:block;margin:0 auto 8px}
 .logotype{line-height:.9}
-.logotype .top{font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:13px;letter-spacing:.32em;color:var(--muted)}
-.logotype .big{font-family:"Barlow Condensed",sans-serif;font-weight:800;font-size:28px;letter-spacing:.02em;margin-top:1px}
-.tourtag{font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:13px;letter-spacing:.2em;color:var(--muted);text-align:right;line-height:1.2}
+.logotype .top{font-family:"Barlow Condensed",sans-serif;font-weight:800;font-size:14px;letter-spacing:.3em;color:var(--text);line-height:1}
+.logotype .big{font-family:"Barlow Condensed",sans-serif;font-weight:800;font-size:28px;letter-spacing:.02em;line-height:1.05;margin-top:2px}
+.tourtag{font-family:"Barlow Condensed",sans-serif;font-weight:800;font-size:14px;letter-spacing:.2em;color:var(--text);text-align:right;line-height:1.25}
 .pill{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;flex:none;font-family:"Barlow Condensed",sans-serif;font-weight:700;letter-spacing:.14em;font-size:12px;padding:3px 9px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
 .pill.live{color:var(--live);border-color:var(--live)}
 .pill.live::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--live);animation:blink 1.4s infinite}
