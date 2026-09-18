@@ -96,6 +96,9 @@
     if(h < 28) return {grade:'까치', tier: tierIn(18, 28)};
     return {grade:'참새', tier: h < 31 ? '골드' : h < 34 ? '실버' : '브론즈'};
   }
+  const GROUPS = (CFG.gradeGroups && CFG.gradeGroups.length) ? CFG.gradeGroups : [{label:'독수리', grades:['독수리']},{label:'매', grades:['매']},{label:'학 · 까치 · 참새', grades:['학','까치','참새']}];
+  const groupOf = m => { const g = m && m.grade; const i = GROUPS.findIndex(x => x.grades.includes(g)); return i >= 0 ? i : (g ? GROUPS.length : GROUPS.length + 1); };
+  const groupLabel = i => i < GROUPS.length ? GROUPS[i].label : (i === GROUPS.length ? '기타 등급' : '등급 미정');
   const gradeChip = m => { if(!m || !m.grade) return ''; const c = (GRADES.find(x=>x[0]===m.grade)||GRADES[2])[2]; const ti = TIERS.indexOf(m.tier); const t = m.tier ? ` <span class="tier t-${ti}">${esc(m.tier)}</span>` : ''; return `<span class="gchip" style="background:${c}">${esc(m.grade)}${t}</span>`; };
   const ghcp = h => { if(h == null || h === '') return ''; h = Math.round(Number(h)*10)/10; return h > 0 ? '+' + h : String(h); };
 
@@ -118,9 +121,8 @@
     warn:'<path d="M12 3 2 21h20zM12 10v5M12 18h.01"/>',
     refresh:'<path d="M21 12a9 9 0 1 1-3-6.7M21 3v6h-6"/>'
   };
-  const EMOJI = { trophy:'🏆', users:'👥', star:'🌟', flag:'⛳', gift:'🎁', info:'📋', fire:'🔥', target:'🎯', bird:'🐦', calendar:'📅', check:'✅', link:'🔗', list:'📝', refresh:'🔄' };
-  const ic = (n, cls) => EMOJI[n] ? `<span class="ic em ${cls||''}" aria-hidden="true">${EMOJI[n]}</span>` : `<svg class="ic ${cls||''}" viewBox="0 0 24 24" aria-hidden="true">${I[n]}</svg>`;
-  const MEDAL = n => `<span class="medal-em" aria-label="${n}위">${{1:'🥇',2:'🥈',3:'🥉'}[n]||n}</span>`;
+  const ic = (n, cls) => `<svg class="ic ${cls||''}" viewBox="0 0 24 24" aria-hidden="true">${I[n]}</svg>`;
+  const MEDAL = n => { const c = {1:['#f2c14e','#b8862b'],2:['#d9dde3','#8c949c'],3:['#e2a065','#a0622a']}[n]; return `<svg class="medal-svg" viewBox="0 0 28 28" aria-label="${n}위"><path d="M9 2h4l2 6-4 3zM19 2h-4l-2 6 4 3z" fill="${c[1]}"/><circle cx="14" cy="17" r="8" fill="${c[0]}" stroke="${c[1]}" stroke-width="1.5"/><text x="14" y="21" text-anchor="middle" font-family="Barlow Condensed,sans-serif" font-weight="800" font-size="11" fill="${c[1]}">${n}</text></svg>`; };
   const EMPTY_SVG = `<svg viewBox="0 0 120 80" aria-hidden="true"><ellipse cx="60" cy="66" rx="44" ry="9" fill="var(--green-soft)"/><path d="M60 62V12" stroke="var(--muted)" stroke-width="2"/><path d="M60 12h22l-6 8 6 8H60z" fill="var(--live)"/><circle cx="46" cy="60" r="4.5" fill="#fff" stroke="var(--line)"/></svg>`;
   const CONTOUR = `<svg class="contour" viewBox="0 0 400 200" preserveAspectRatio="none" aria-hidden="true"><g fill="none" stroke="#fff" stroke-width="1.2"><path d="M-20 150c60-40 120-40 180-10s120 30 260-20"/><path d="M-20 170c60-40 120-40 180-10s120 30 260-20"/><path d="M-20 190c60-40 120-40 180-10s120 30 260-20"/><path d="M220 40c40-30 90-30 200-10"/><path d="M240 60c40-30 90-30 180-10"/></g></svg>`;
   const statusPill = st => st==='종료' ? '<span class="pill done">종료</span>' : '<span class="pill live">LIVE</span>';
@@ -162,8 +164,8 @@
   }
   function autoPrizes(S,e){
     const rows = board(S,e); if(!rows.length) return [];
-    const out = [], titles = ['우승','준우승','3위'];
-    rows.filter(r => r.rank <= 3).forEach(r => out.push({medal:r.rank, title:titles[r.rank-1], name:r.dname, detail: r.net !== r.gross ? `보정 ${r.net}타 (실타 ${r.gross})` : `${r.gross}타`}));
+    const out = [];
+    groupedRows(rows, S).forEach(g => { const r = g.rows[0]; out.push({medal:1, title:`${g.label} 1위`, name:r.dname, detail: r.net !== r.gross ? `보정 ${r.net}타 (실타 ${r.gross})` : `${r.gross}타`}); });
     if(rows.some(r => r.net !== r.gross)){ const g = [...rows].sort((a,b)=>a.gross-b.gross)[0]; out.push({medal:'M', title:'메달리스트 (실타 1위)', name:g.dname, detail:`${g.gross}타`}); }
     const b = [...rows].sort((a,b)=>b.birdies-a.birdies)[0]; if(b && b.birdies > 0) out.push({medal:'B', title:'버디왕', name:b.dname, detail:`버디 ${b.birdies}개`});
     return out;
@@ -202,23 +204,25 @@
     return `<div class="card" style="padding:4px 8px"><div class="tbl-wrap"><table><thead><tr><th></th><th>참가자</th>${hasNet?'<th class="r">보정</th>':''}<th class="r">베스트</th><th class="r">라운드</th></tr></thead><tbody>${rows.map(r => `<tr class="${r.rank===1?'p1':''}"><td class="rank r${r.rank}">${r.rank<=3 ? MEDAL(r.rank) : r.rank}</td><td class="name">${esc(r.name)}${gradeChip(S.member(r.name))}<div class="sub">${fmtDate(r.last)}${r.birdies?` · 버디 ${r.birdies}`:''}</div></td>${hasNet?`<td class="num r" style="color:var(--green)">${r.bestNet}</td>`:''}<td class="num r">${r.bestGross}</td><td class="r sub">${r.n}</td></tr>`).join('')}</tbody></table></div></div><p class="meta" style="margin-top:8px">회원별 베스트 스코어 기준 · 운영진이 라운드를 등록할 때마다 갱신됩니다. 최종 순위는 대회 종료 후 골프존 대회 통계로 확정합니다.</p>`;
   }
   function manualLead(S,e,pattern){ const l = S.leaders.find(x => x.eventId === e.id && pattern.test(x.cat.replace(/\s/g,''))); return l && l.name ? {name:S.display(l.name), value:l.value} : null; }
+  function groupedRows(rows, S){
+    const groups = {};
+    rows.forEach(r => { const gi = groupOf(S.member(r.name)); (groups[gi] = groups[gi] || []).push(r); });
+    return Object.keys(groups).map(Number).sort((a,b)=>a-b).map(gi => ({gi, label: groupLabel(gi), rows: groups[gi]}));
+  }
   function liveSummaryHtml(S,e){
-    const rows = liveRows(S,e), st = roundStats(S,e);
+    const rows = liveRows(S,e);
     const hasNet = rows.some(r => r.bestNet !== r.bestGross);
+    if(!rows.length) return `<div class="empty illus">${EMPTY_SVG}첫 라운드 결과가 등록되면 등급별 순위가 표시됩니다.</div>`;
+    return groupedRows(rows, S).map(g => {
+      let rank = 0; g.rows.forEach((r,i) => { if(i===0 || r.bestNet !== g.rows[i-1].bestNet) rank = i+1; r.grank = rank; });
+      return `<div class="gboard"><div class="gboard-head"><span class="gname">${esc(g.label)}</span><span class="meta">${g.rows.length}명</span></div><div class="card scroll" style="padding:4px 8px"><div class="tbl-wrap"><table><thead><tr><th></th><th>참가자</th>${hasNet?'<th class="r">보정</th>':''}<th class="r">베스트</th><th class="r">라운드</th></tr></thead><tbody>${g.rows.map(r => `<tr class="${r.grank===1?'p1':''}"><td class="rank r${r.grank}">${r.grank===1 ? MEDAL(1) : r.grank}</td><td class="name">${esc(r.name)}${gradeChip(S.member(r.name))}<div class="sub">${fmtDate(r.last)}${r.birdies?` · 버디 ${r.birdies}`:''}</div></td>${hasNet?`<td class="num r" style="color:var(--green)">${r.bestNet}</td>`:''}<td class="num r">${r.bestGross}</td><td class="r sub">${r.n}</td></tr>`).join('')}</tbody></table></div></div></div>`;
+    }).join('') + `<p class="meta" style="margin-top:8px">등급 그룹별 · 회원별 베스트 스코어 기준. 운영진이 라운드를 등록할 때마다 갱신되며, 최종 순위는 대회 종료 후 골프존 대회 통계로 확정합니다.</p>`;
+  }
+  function recordsHtml(S,e){
+    const st = roundStats(S,e);
     const most = st[0] && st[0].n ? {name:st[0].name, value:`${st[0].n}회`} : null;
-    const byGrade = {};
-    rows.forEach(r => { const m = S.member(r.name); const g = m && m.grade ? m.grade : '등급 미정'; if(!byGrade[g]) byGrade[g] = r; });
-    const gradeOrder = [...GRADES.map(g=>g[0]), '등급 미정'].filter(g => byGrade[g]);
     const item = (icon, title, lead, gold) => `<div class="prize"><div class="medal ${gold?'g':''}">${icon}</div><div><div class="t">${esc(title)}</div><div class="w">${lead ? esc(lead.name) : '<span class="sub">아직 없음</span>'}</div></div><div class="i">${lead ? esc(lead.value||'') : ''}</div></div>`;
-    const gradeItems = gradeOrder.map(g => { const r = byGrade[g]; const m = S.member(r.name); const chip = m && m.grade ? gradeChip({grade:m.grade, tier:''}).replace('margin-left:6px','') : ''; return `<div class="prize"><div class="medal">${MEDAL(1)}</div><div><div class="t">${esc(g)} 1위</div><div class="w">${esc(r.name)}${m ? gradeChip(m) : ''}</div></div><div class="i">${hasNet ? `보정 ${r.bestNet} <span class="sub">(실타 ${r.bestGross})</span>` : `${r.bestGross}타`}<div class="sub">${r.n}라운드</div></div></div>`; }).join('');
-    if(!rows.length && !most && !manualLead(S,e,/롱기/) && !manualLead(S,e,/니어/)) return `<div class="empty illus">${EMPTY_SVG}첫 라운드 결과가 등록되면 현황이 표시됩니다.</div>`;
-    return `<div class="card" style="padding:4px 16px">
-      ${item(ic('fire'), '최다참여', most, true)}
-      ${gradeItems || `<div class="prize"><div class="medal">${ic('flag')}</div><div><div class="t">등급별 1위</div><div class="w"><span class="sub">아직 없음</span></div></div></div>`}
-      ${item(ic('target'), '롱기스트 (남)', manualLead(S,e,/롱기.*남/))}
-      ${item(ic('target'), '롱기스트 (여)', manualLead(S,e,/롱기.*여/))}
-      ${item(ic('target'), '니어핀', manualLead(S,e,/니어/))}
-    </div><p class="meta" style="margin-top:8px">등급별 1위는 회원별 베스트 스코어 기준. 운영진이 라운드·기록을 등록할 때마다 갱신되며, 최종 순위는 대회 종료 후 골프존 대회 통계로 확정합니다.</p>`;
+    return `<div class="card" style="padding:4px 16px">${item(ic('fire'), '최다참여', most, true)}${item(ic('target'), '롱기스트 (남)', manualLead(S,e,/롱기.*남/))}${item(ic('target'), '롱기스트 (여)', manualLead(S,e,/롱기.*여/))}${item(ic('target'), '니어핀', manualLead(S,e,/니어/))}</div>`;
   }
   function participationHtml(S,e){
     const st = roundStats(S,e); if(!st.length) return `<div class="empty">아직 등록된 라운드가 없습니다. 플레이 후 운영진에게 알려주세요.</div>`;
@@ -226,11 +230,14 @@
   }
   function participantsHtml(S,e){
     const ens = entriesOf(S,e); if(!ens.length) return '<div class="empty">아직 접수된 참가자가 없습니다.</div>';
-    return `<div class="card scroll" style="padding:6px 16px">${ens.map(n => { const m = S.member(n.name) || {}; const gz = n.gzNick || m.gzNick || ''; const hcp = n.hcp != null ? n.hcp : m.hcp; const info = [gz ? `골프존 ${esc(gz)}` : '', hcp != null ? `G핸디 ${ghcp(hcp)}` : ''].filter(Boolean).join(' · '); return `<div class="check"><span class="grow"><span class="name">${esc(S.display(n.name))}${gradeChip(m)}</span>${info ? `<div class="sub">${info}</div>` : ''}</span>${n.paid ? '<span class="tag paid">입금 확인</span>' : '<span class="tag unpaid">입금 대기</span>'}</div>`; }).join('')}</div>`;
+    return `<div class="card scroll" style="padding:6px 16px">${ens.map(n => `<div class="check"><span class="grow name">${esc(S.display(n.name))}${gradeChip(S.member(n.name))}</span>${n.paid ? '<span class="tag paid">입금 확인</span>' : '<span class="tag unpaid">입금 대기</span>'}</div>`).join('')}</div>`;
   }
   function boardHtml(S,e){
     const rows = board(S,e); if(!rows.length) return `<div class="empty illus">${EMPTY_SVG}최종 결과가 등록되면 순위가 표시됩니다.</div>`;
     const hasNet = rows.some(r => r.net !== r.gross);
+    return groupedRows(rows, S).map(g => { const rs = g.rows.map((r,i) => ({...r, rank: i+1})); return `<div class="gboard"><div class="gboard-head"><span class="gname">${esc(g.label)}</span><span class="meta">${rs.length}명</span></div>${boardTable(S, rs, hasNet)}</div>`; }).join('');
+  }
+  function boardTable(S, rows, hasNet){
     return `<div class="tbl-wrap scroll"><table><thead><tr><th></th><th>참가자</th><th class="r">실타</th>${hasNet?'<th class="r">보정타</th>':''}<th class="r">버디</th></tr></thead><tbody>${rows.map(r => `<tr class="${r.rank===1?'p1':''}"><td class="rank r${r.rank}">${r.rank<=3 ? MEDAL(r.rank) : r.rank}</td><td class="name">${esc(r.dname)}${gradeChip(S.member(r.name))}</td><td class="num r">${r.gross}</td>${hasNet?`<td class="num r" style="color:var(--green)">${r.net}</td>`:''}<td class="r">${r.birdies||0}</td></tr>`).join('')}</tbody></table></div>`;
   }
   function prizesHtml(S,e){
@@ -242,8 +249,7 @@
   function sponsorsHtml(S,e){
     const list = S.sponsors.filter(s => !e || s.eventId === e.id || s.eventId === '');
     if(!list.length) return '';
-    const total = list.reduce((a,s) => a + (s.qty||1), 0);
-    return `<div class="card" style="margin-top:10px"><div class="eyebrow" style="margin-bottom:6px">협찬 <span class="sub" style="font-weight:400;letter-spacing:0">· ${list.length}명 · ${total}개</span></div><div class="spon"><div class="spon-h"><span>협찬자</span><span>협찬 물품</span><span class="r">수량</span></div>${list.map(s => `<div class="spon-r"><span class="name">${esc(s.name)}</span><span>${esc(s.item)}</span><span class="r num">${s.qty}</span></div>`).join('')}</div></div>`;
+    return `<div class="card" style="margin-top:10px"><div class="eyebrow" style="margin-bottom:6px">협찬</div>${list.map(s => `<div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0"><span class="name">${esc(s.name)}</span><span class="meta">${esc(s.item)}${s.qty>1?` × ${s.qty}`:''}</span></div>`).join('')}</div>`;
   }
   function footerHtml(){ return `<footer><img src="img/logo.png" alt=""><div>CLUB FAIRWAY · Attitude Over Skill, People Over Score · EST. 2026</div></footer>`; }
 
@@ -255,5 +261,5 @@
   });
   let toastT; function toast(msg){ let t = document.getElementById('toast'); if(!t){ t = document.createElement('div'); t.id = 'toast'; t.className = 'toast'; document.body.appendChild(t); } t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(()=>t.classList.remove('show'), 2200); }
 
-  window.CF = { CFG, esc, won, num, isoDate, fmtDate, period, loadData, gradeFromHcp, gradeChip, ghcp, ic, MEDAL, EMPTY_SVG, CONTOUR, statusPill, entryOpen, posterUrl, entriesOf, roundsOf, scoresOf, currentEvent, board, roundStats, leaderRows, autoPrizes, heroHtml, briefHtml, leaderBoardHtml, participationHtml, liveBoardHtml, liveSummaryHtml, liveRows, participantsHtml, boardHtml, prizesHtml, sponsorsHtml, footerHtml, toast, GRADES, TIERS };
+  window.CF = { CFG, esc, won, num, isoDate, fmtDate, period, loadData, gradeFromHcp, gradeChip, ghcp, ic, MEDAL, EMPTY_SVG, CONTOUR, statusPill, entryOpen, posterUrl, entriesOf, roundsOf, scoresOf, currentEvent, board, roundStats, leaderRows, autoPrizes, heroHtml, briefHtml, leaderBoardHtml, participationHtml, liveBoardHtml, liveSummaryHtml, recordsHtml, liveRows, GROUPS, participantsHtml, boardHtml, prizesHtml, sponsorsHtml, footerHtml, toast, GRADES, TIERS };
 })();

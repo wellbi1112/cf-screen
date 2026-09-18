@@ -7,7 +7,7 @@
 <meta name="description" content="클럽 페어웨이 스크린대회 요강, 참가 신청, 라이브 기록과 최종 순위">
 <link rel="icon" href="img/logo.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Noto+Sans+KR:wght@400;500;700&display=swap">
-<link rel="stylesheet" href="style.css?v=4">
+<link rel="stylesheet" href="style.css">
 <style>
   #app{padding-bottom:24px}
   .loading{padding:40px 10px;text-align:center;color:var(--muted)}
@@ -30,7 +30,7 @@
   <main id="view"><div class="loading"><div class="spin"></div>대회 정보를 불러오는 중…</div></main>
 </div>
 <script src="config.js"></script>
-<script src="app.js?v=4"></script>
+<script src="app.js"></script>
 <script>
 (async function(){
   const C = window.CF; const view = document.getElementById('view');
@@ -40,14 +40,14 @@
     catch(err){ view.innerHTML = `<div class="empty illus">${C.EMPTY_SVG}대회 정보를 불러오지 못했습니다.<br><span class="sub">잠시 후 다시 열어 주세요.</span></div>` + C.footerHtml(); return; }
     const e = C.currentEvent(S);
     const parts = [C.heroHtml(S,e)];
-    if(e && e.status !== '종료') parts.push(`<section><div class="sec-head"><h2>${C.ic('trophy')}<span class="pill live" style="margin-right:2px">LIVE</span> 리더보드</h2><span class="meta">${C.roundsOf(S,e).length} 라운드 · ${C.liveRows(S,e).length}명</span></div>${C.liveSummaryHtml(S,e)}</section>`);
+    if(e && e.status !== '종료') parts.push(`<section><div class="sec-head"><h2>${C.ic('trophy')}<span class="pill live" style="margin-right:2px">LIVE</span> 등급별 현재 순위</h2><span class="meta">${C.roundsOf(S,e).length} 라운드 · ${C.liveRows(S,e).length}명</span></div>${C.liveSummaryHtml(S,e)}</section><section><div class="sec-head"><h2>${C.ic('star')}기록 부문</h2><span class="meta">운영진 수시 갱신</span></div>${C.recordsHtml(S,e)}</section>`);
     if(e){
       parts.push(`<section><div class="sec-head"><h2>${C.ic('users')}참가자</h2><span class="meta">${C.entriesOf(S,e).length}명 접수${C.entryOpen(e)?' · 접수 중':''}</span></div>${C.participantsHtml(S,e)}</section>`);
       if(e.status !== '종료'){
         parts.push(`<section><div class="sec-head"><h2>${C.ic('users')}참여 현황</h2><span class="meta">${C.roundsOf(S,e).length} 라운드 · ${C.roundStats(S,e).length}명</span></div>${C.participationHtml(S,e)}</section>`);
       }
       if(e.status === '종료' || C.scoresOf(S,e).length){
-        parts.push(`<section><div class="sec-head"><h2>${C.ic('trophy')}최종 순위</h2><span class="meta">골프존 대회 통계 기준</span></div>${C.boardHtml(S,e)}</section>`);
+        parts.push(`<section><div class="sec-head"><h2>${C.ic('trophy')}등급별 최종 순위</h2><span class="meta">골프존 대회 통계 기준</span></div>${C.boardHtml(S,e)}</section>`);
         const pz = C.prizesHtml(S,e); if(pz) parts.push(`<section><div class="sec-head"><h2>${C.ic('star')}시상</h2></div>${pz}</section>`);
         if(e.status === '종료' && C.roundsOf(S,e).length) parts.push(`<section><div class="sec-head"><h2>${C.ic('users')}참여 현황</h2><span class="meta">${C.roundsOf(S,e).length} 라운드</span></div>${C.participationHtml(S,e)}</section>`);
       }
