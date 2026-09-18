@@ -99,6 +99,7 @@
   const GROUPS = (CFG.gradeGroups && CFG.gradeGroups.length) ? CFG.gradeGroups : [{label:'독수리', grades:['독수리']},{label:'매', grades:['매']},{label:'학 · 까치 · 참새', grades:['학','까치','참새']}];
   const groupOf = m => { const g = m && m.grade; const i = GROUPS.findIndex(x => x.grades.includes(g)); return i >= 0 ? i : (g ? GROUPS.length : GROUPS.length + 1); };
   const groupLabel = i => i < GROUPS.length ? GROUPS[i].label : (i === GROUPS.length ? '기타 등급' : '등급 미정');
+  const gzTag = m => (m && m.gzNick && m.gzNick !== m.name) ? `<span class="gz">골프존 ${esc(m.gzNick)}</span>` : '';
   const gradeChip = m => { if(!m || !m.grade) return ''; const c = (GRADES.find(x=>x[0]===m.grade)||GRADES[2])[2]; const ti = TIERS.indexOf(m.tier); const t = m.tier ? ` <span class="tier t-${ti}">${esc(m.tier)}</span>` : ''; return `<span class="gchip" style="background:${c}">${esc(m.grade)}${t}</span>`; };
   const ghcp = h => { if(h == null || h === '') return ''; h = Math.round(Number(h)*10)/10; return h > 0 ? '+' + h : String(h); };
 
@@ -201,7 +202,7 @@
     const rows = liveRows(S,e);
     if(!rows.length) return `<div class="empty illus">${EMPTY_SVG}첫 라운드 결과가 등록되면 현재 순위가 표시됩니다.</div>`;
     const hasNet = rows.some(r => r.bestNet !== r.bestGross);
-    return `<div class="card" style="padding:4px 8px"><div class="tbl-wrap"><table><thead><tr><th></th><th>참가자</th>${hasNet?'<th class="r">보정</th>':''}<th class="r">베스트</th><th class="r">라운드</th></tr></thead><tbody>${rows.map(r => `<tr class="${r.rank===1?'p1':''}"><td class="rank r${r.rank}">${r.rank<=3 ? MEDAL(r.rank) : r.rank}</td><td class="name">${esc(r.name)}${gradeChip(S.member(r.name))}<div class="sub">${fmtDate(r.last)}${r.birdies?` · 버디 ${r.birdies}`:''}</div></td>${hasNet?`<td class="num r" style="color:var(--green)">${r.bestNet}</td>`:''}<td class="num r">${r.bestGross}</td><td class="r sub">${r.n}</td></tr>`).join('')}</tbody></table></div></div><p class="meta" style="margin-top:8px">회원별 베스트 스코어 기준 · 운영진이 라운드를 등록할 때마다 갱신됩니다. 최종 순위는 대회 종료 후 골프존 대회 통계로 확정합니다.</p>`;
+    return `<div class="card" style="padding:4px 8px"><div class="tbl-wrap"><table><thead><tr><th></th><th>참가자</th>${hasNet?'<th class="r">보정</th>':''}<th class="r">베스트</th><th class="r">라운드</th></tr></thead><tbody>${rows.map(r => `<tr class="${r.rank===1?'p1':''}"><td class="rank r${r.rank}">${r.rank<=3 ? MEDAL(r.rank) : r.rank}</td><td class="name">${esc(r.name)}${gradeChip(S.member(r.name))}<div class="sub">${gzTag(S.member(r.name))}${fmtDate(r.last)}${r.birdies?` · 버디 ${r.birdies}`:''}</div></td>${hasNet?`<td class="num r" style="color:var(--green)">${r.bestNet}</td>`:''}<td class="num r">${r.bestGross}</td><td class="r sub">${r.n}</td></tr>`).join('')}</tbody></table></div></div><p class="meta" style="margin-top:8px">회원별 베스트 스코어 기준 · 운영진이 라운드를 등록할 때마다 갱신됩니다. 최종 순위는 대회 종료 후 골프존 대회 통계로 확정합니다.</p>`;
   }
   function manualLead(S,e,pattern){ const l = S.leaders.find(x => x.eventId === e.id && pattern.test(x.cat.replace(/\s/g,''))); return l && l.name ? {name:S.display(l.name), value:l.value} : null; }
   function groupedRows(rows, S){
@@ -215,7 +216,7 @@
     if(!rows.length) return `<div class="empty illus">${EMPTY_SVG}첫 라운드 결과가 등록되면 등급별 순위가 표시됩니다.</div>`;
     return groupedRows(rows, S).map(g => {
       let rank = 0; g.rows.forEach((r,i) => { if(i===0 || r.bestNet !== g.rows[i-1].bestNet) rank = i+1; r.grank = rank; });
-      return `<div class="gboard"><div class="gboard-head"><span class="gname">${esc(g.label)}</span><span class="meta">${g.rows.length}명</span></div><div class="card scroll" style="padding:4px 8px"><div class="tbl-wrap"><table><thead><tr><th></th><th>참가자</th>${hasNet?'<th class="r">보정</th>':''}<th class="r">베스트</th><th class="r">라운드</th></tr></thead><tbody>${g.rows.map(r => `<tr class="${r.grank===1?'p1':''}"><td class="rank r${r.grank}">${r.grank===1 ? MEDAL(1) : r.grank}</td><td class="name">${esc(r.name)}${gradeChip(S.member(r.name))}<div class="sub">${fmtDate(r.last)}${r.birdies?` · 버디 ${r.birdies}`:''}</div></td>${hasNet?`<td class="num r" style="color:var(--green)">${r.bestNet}</td>`:''}<td class="num r">${r.bestGross}</td><td class="r sub">${r.n}</td></tr>`).join('')}</tbody></table></div></div></div>`;
+      return `<div class="gboard"><div class="gboard-head"><span class="gname">${esc(g.label)}</span><span class="meta">${g.rows.length}명</span></div><div class="card scroll" style="padding:4px 8px"><div class="tbl-wrap"><table><thead><tr><th></th><th>참가자</th>${hasNet?'<th class="r">보정</th>':''}<th class="r">베스트</th><th class="r">라운드</th></tr></thead><tbody>${g.rows.map(r => `<tr class="${r.grank===1?'p1':''}"><td class="rank r${r.grank}">${r.grank===1 ? MEDAL(1) : r.grank}</td><td class="name">${esc(r.name)}${gradeChip(S.member(r.name))}<div class="sub">${gzTag(S.member(r.name))}${fmtDate(r.last)}${r.birdies?` · 버디 ${r.birdies}`:''}</div></td>${hasNet?`<td class="num r" style="color:var(--green)">${r.bestNet}</td>`:''}<td class="num r">${r.bestGross}</td><td class="r sub">${r.n}</td></tr>`).join('')}</tbody></table></div></div></div>`;
     }).join('') + `<p class="meta" style="margin-top:8px">등급 그룹별 · 회원별 베스트 스코어 기준. 운영진이 라운드를 등록할 때마다 갱신되며, 최종 순위는 대회 종료 후 골프존 대회 통계로 확정합니다.</p>`;
   }
   function recordsHtml(S,e){
@@ -226,11 +227,11 @@
   }
   function participationHtml(S,e){
     const st = roundStats(S,e); if(!st.length) return `<div class="empty">아직 등록된 라운드가 없습니다. 플레이 후 운영진에게 알려주세요.</div>`;
-    return `<div class="card scroll" style="padding:4px 8px"><div class="tbl-wrap"><table><thead><tr><th>참가자</th><th class="r">라운드</th><th class="r">최근 플레이</th><th class="r">베스트</th></tr></thead><tbody>${st.map((a,i) => `<tr class="${i===0?'p1':''}"><td class="name">${esc(a.name)}${gradeChip(S.member(a.name))}</td><td class="num r">${a.n}</td><td class="r sub">${fmtDate(a.last)}</td><td class="num r">${a.best ?? '—'}</td></tr>`).join('')}</tbody></table></div></div>`;
+    return `<div class="card scroll" style="padding:4px 8px"><div class="tbl-wrap"><table><thead><tr><th>참가자</th><th class="r">라운드</th><th class="r">최근 플레이</th><th class="r">베스트</th></tr></thead><tbody>${st.map((a,i) => `<tr class="${i===0?'p1':''}"><td class="name">${esc(a.name)}${gradeChip(S.member(a.name))}${gzTag(S.member(a.name))}</td><td class="num r">${a.n}</td><td class="r sub">${fmtDate(a.last)}</td><td class="num r">${a.best ?? '—'}</td></tr>`).join('')}</tbody></table></div></div>`;
   }
   function participantsHtml(S,e){
     const ens = entriesOf(S,e); if(!ens.length) return '<div class="empty">아직 접수된 참가자가 없습니다.</div>';
-    return `<div class="card scroll" style="padding:6px 16px">${ens.map(n => `<div class="check"><span class="grow name">${esc(S.display(n.name))}${gradeChip(S.member(n.name))}</span>${n.paid ? '<span class="tag paid">입금 확인</span>' : '<span class="tag unpaid">입금 대기</span>'}</div>`).join('')}</div>`;
+    return `<div class="card scroll" style="padding:6px 16px">${ens.map(n => `<div class="check"><span class="grow name">${esc(S.display(n.name))}${gradeChip(S.member(n.name))}${gzTag(S.member(n.name))}</span>${n.paid ? '<span class="tag paid">입금 확인</span>' : '<span class="tag unpaid">입금 대기</span>'}</div>`).join('')}</div>`;
   }
   function boardHtml(S,e){
     const rows = board(S,e); if(!rows.length) return `<div class="empty illus">${EMPTY_SVG}최종 결과가 등록되면 순위가 표시됩니다.</div>`;
@@ -238,7 +239,7 @@
     return groupedRows(rows, S).map(g => { const rs = g.rows.map((r,i) => ({...r, rank: i+1})); return `<div class="gboard"><div class="gboard-head"><span class="gname">${esc(g.label)}</span><span class="meta">${rs.length}명</span></div>${boardTable(S, rs, hasNet)}</div>`; }).join('');
   }
   function boardTable(S, rows, hasNet){
-    return `<div class="tbl-wrap scroll"><table><thead><tr><th></th><th>참가자</th><th class="r">실타</th>${hasNet?'<th class="r">보정타</th>':''}<th class="r">버디</th></tr></thead><tbody>${rows.map(r => `<tr class="${r.rank===1?'p1':''}"><td class="rank r${r.rank}">${r.rank<=3 ? MEDAL(r.rank) : r.rank}</td><td class="name">${esc(r.dname)}${gradeChip(S.member(r.name))}</td><td class="num r">${r.gross}</td>${hasNet?`<td class="num r" style="color:var(--green)">${r.net}</td>`:''}<td class="r">${r.birdies||0}</td></tr>`).join('')}</tbody></table></div>`;
+    return `<div class="tbl-wrap scroll"><table><thead><tr><th></th><th>참가자</th><th class="r">실타</th>${hasNet?'<th class="r">보정타</th>':''}<th class="r">버디</th></tr></thead><tbody>${rows.map(r => `<tr class="${r.rank===1?'p1':''}"><td class="rank r${r.rank}">${r.rank<=3 ? MEDAL(r.rank) : r.rank}</td><td class="name">${esc(r.dname)}${gradeChip(S.member(r.name))}${gzTag(S.member(r.name))}</td><td class="num r">${r.gross}</td>${hasNet?`<td class="num r" style="color:var(--green)">${r.net}</td>`:''}<td class="r">${r.birdies||0}</td></tr>`).join('')}</tbody></table></div>`;
   }
   function prizesHtml(S,e){
     const auto = autoPrizes(S,e), manual = S.prizes.filter(p => p.eventId === e.id);
@@ -261,5 +262,5 @@
   });
   let toastT; function toast(msg){ let t = document.getElementById('toast'); if(!t){ t = document.createElement('div'); t.id = 'toast'; t.className = 'toast'; document.body.appendChild(t); } t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(()=>t.classList.remove('show'), 2200); }
 
-  window.CF = { CFG, esc, won, num, isoDate, fmtDate, period, loadData, gradeFromHcp, gradeChip, ghcp, ic, MEDAL, EMPTY_SVG, CONTOUR, statusPill, entryOpen, posterUrl, entriesOf, roundsOf, scoresOf, currentEvent, board, roundStats, leaderRows, autoPrizes, heroHtml, briefHtml, leaderBoardHtml, participationHtml, liveBoardHtml, liveSummaryHtml, recordsHtml, liveRows, GROUPS, participantsHtml, boardHtml, prizesHtml, sponsorsHtml, footerHtml, toast, GRADES, TIERS };
+  window.CF = { CFG, esc, won, num, isoDate, fmtDate, period, loadData, gradeFromHcp, gradeChip, ghcp, ic, MEDAL, EMPTY_SVG, CONTOUR, statusPill, entryOpen, posterUrl, entriesOf, roundsOf, scoresOf, currentEvent, board, roundStats, leaderRows, autoPrizes, heroHtml, briefHtml, leaderBoardHtml, participationHtml, gzTag, liveBoardHtml, liveSummaryHtml, recordsHtml, liveRows, GROUPS, participantsHtml, boardHtml, prizesHtml, sponsorsHtml, footerHtml, toast, GRADES, TIERS };
 })();
